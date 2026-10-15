@@ -1,0 +1,17 @@
+{
+  "name": "easyquiz",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Snip a question, get the answer next to your cursor. Browser extension powered by Groq.",
+  "license": "MIT",
+  "repository": "github:Sanjay-Sunil/easyQuiz",
+  "scripts": {
+    "lint": "for f in *.js; do node --check \"$f\" || exit 1; done && web-ext lint --self-hosted --ignore-files 'dist/**' 'tests/**' 'docs/**' 'node_modules/**' 'build.sh' '*.md' 'package*.json'",
+    "test": "node tests/e2e.mjs",
+    "build": "./build.sh"
+  },
+  "devDependencies": {
+    "playwright": "^1.64.1",
+    "web-ext": "^8.0.0"
+  }
+}
