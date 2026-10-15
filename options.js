@@ -1,11 +1,13 @@
 const $ = (id) => document.getElementById(id);
+const api = EQ_api;
+const ALL_SITES = { origins: ['<all_urls>'] };
 const KEY_NAMES = ['activate', 'exit', 'retry'];
 const MODIFIERS = ['Shift', 'Control', 'Alt', 'Meta', 'AltGraph', 'OS'];
 let s = EQ_merge();
 let recording = null;
 
 async function load() {
-  const { rl, ...stored } = await chrome.storage.local.get(null);
+  const { rl, ...stored } = await api.storage.local.get(null);
   s = EQ_merge(stored);
   $('apiKey').value = s.apiKey;
   $('autoSendSec').value = s.autoSendSec;
@@ -15,6 +17,7 @@ async function load() {
   $('reasoning').value = s.reasoning;
   renderKeys();
   renderUsage();
+  renderAccess();
 }
 
 function keyErrors() {
@@ -43,7 +46,7 @@ function renderKeys() {
 }
 
 async function renderUsage() {
-  const { rl } = await chrome.storage.local.get('rl');
+  const { rl } = await api.storage.local.get('rl');
   if (!rl || rl.reqLeft == null) return ($('usage').textContent = '');
   const mins = Math.max(0, Math.ceil((rl.reqReset - Date.now()) / 6e4));
   $('usage').textContent = `Groq: ${rl.reqLeft}/${rl.reqLimit} requests left today` + (mins ? ` · fully resets in ~${mins} min` : '');
@@ -77,7 +80,7 @@ $('test').addEventListener('click', async () => {
   const st = $('testStatus');
   st.className = 'status';
   st.textContent = 'Checking…';
-  const res = await chrome.runtime.sendMessage({
+  const res = await api.runtime.sendMessage({
     type: 'test',
     apiKey: $('apiKey').value.trim(),
     model: $('model').value.trim(),
@@ -96,7 +99,20 @@ $('test').addEventListener('click', async () => {
 
 $('openShortcuts').addEventListener('click', (e) => {
   e.preventDefault();
-  chrome.tabs.create({ url: 'chrome://extensions/shortcuts' });
+  if (api.commands?.openShortcutSettings) return api.commands.openShortcutSettings(); // Firefox 137+
+  if (navigator.userAgent.includes('Firefox'))
+    return ($('shortcutHelp').textContent = 'Open about:addons → ⚙ → Manage Extension Shortcuts.');
+  api.tabs.create({ url: 'chrome://extensions/shortcuts' });
+});
+
+// Firefox can install MV3 extensions without site access; the overlay and screenshots need it.
+async function renderAccess() {
+  const ok = await api.permissions.contains(ALL_SITES).catch(() => true);
+  $('access').hidden = ok;
+}
+$('grantAccess').addEventListener('click', async () => {
+  await api.permissions.request(ALL_SITES).catch(() => false);
+  renderAccess();
 });
 
 $('save').addEventListener('click', async () => {
@@ -109,7 +125,7 @@ $('save').addEventListener('click', async () => {
     model: $('model').value.trim() || EQ_DEFAULTS.model,
     reasoning: $('reasoning').value,
   });
-  await chrome.storage.local.set(s);
+  await api.storage.local.set(s);
   $('autoSendSec').value = sec;
   const st = $('saveStatus');
   st.className = 'status ok';

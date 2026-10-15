@@ -1,6 +1,9 @@
 // Shared by background, content scripts and the options page.
 // Assigned to `self` (not const) so re-injecting the script never throws.
 
+// Firefox (and Zen, LibreWolf…) expose promise-based `browser`; Chromium exposes `chrome`.
+self.EQ_api = globalThis.browser ?? globalThis.chrome;
+
 self.EQ_DEFAULTS = {
   apiKey: '',
   model: 'qwen/qwen3.8-27b',

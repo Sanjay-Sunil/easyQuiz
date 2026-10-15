@@ -1,4 +1,6 @@
-importScripts('defaults.js');
+// Chromium runs this as a service worker; Firefox loads defaults.js via manifest `scripts`.
+if (typeof importScripts === 'function') importScripts('defaults.js');
+const api = EQ_api;
 
 const API = 'https://api.groq.com/openai/v1';
 const IMAGE_TOKENS = 2048; // Groq counts every image as 2048 input tokens
@@ -17,21 +19,21 @@ const jobs = new Map(); // tabId -> AbortController of the in-flight ask
 
 // ---------- lifecycle ----------
 
-chrome.runtime.onInstalled.addListener(async ({ reason }) => {
-  if (reason === 'install') chrome.runtime.openOptionsPage();
+api.runtime.onInstalled.addListener(async ({ reason }) => {
+  if (reason === 'install') api.runtime.openOptionsPage();
   // Content scripts only auto-load on new page loads; cover tabs that are already open.
-  const tabs = await chrome.tabs.query({ url: ['http://*/*', 'https://*/*'] });
+  const tabs = await api.tabs.query({ url: ['http://*/*', 'https://*/*'] });
   for (const t of tabs) inject(t.id).catch(() => {});
 });
 
-chrome.commands.onCommand.addListener((cmd, tab) => {
+api.commands.onCommand.addListener((cmd, tab) => {
   if (cmd === 'activate' && tab?.id != null) toTop(tab.id, { type: 'activate' });
 });
 
-chrome.action.onClicked.addListener((tab) => toTop(tab.id, { type: 'activate' }));
+api.action.onClicked.addListener((tab) => toTop(tab.id, { type: 'activate' }));
 
 function inject(tabId) {
-  return chrome.scripting.executeScript({
+  return api.scripting.executeScript({
     target: { tabId, allFrames: true },
     files: ['defaults.js', 'content.js'],
   });
@@ -39,11 +41,11 @@ function inject(tabId) {
 
 async function toTop(tabId, msg) {
   try {
-    await chrome.tabs.sendMessage(tabId, msg, { frameId: 0 });
+    await api.tabs.sendMessage(tabId, msg, { frameId: 0 });
   } catch {
     try {
       await inject(tabId);
-      await chrome.tabs.sendMessage(tabId, msg, { frameId: 0 });
+      await api.tabs.sendMessage(tabId, msg, { frameId: 0 });
     } catch {
       // Restricted page (chrome://, Web Store, PDF viewer): nothing we can do.
     }
@@ -52,30 +54,45 @@ async function toTop(tabId, msg) {
 
 // ---------- messages ----------
 
-chrome.runtime.onMessage.addListener((m, sender, reply) => {
-  const tabId = sender.tab?.id;
+// Zen (and possibly other Firefox forks) can deliver content-script messages
+// without `sender.tab`; the sender is then the active tab, since that is where
+// the user just pressed a key or dragged.
+async function senderTab(sender) {
+  if (sender.tab) return sender.tab;
+  const [tab] = await api.tabs.query({ active: true, lastFocusedWindow: true });
+  return tab;
+}
+
+api.runtime.onMessage.addListener((m, sender, reply) => {
+  senderTab(sender).then((tab) => handle(m, tab, reply));
+  return ['capture', 'ask', 'test'].includes(m.type);
+});
+
+function handle(m, tab, reply) {
+  const tabId = tab?.id;
   switch (m.type) {
     case 'activate': // from an iframe -> top frame
     case 'key':
-      if (tabId != null) chrome.tabs.sendMessage(tabId, m, { frameId: 0 }).catch(() => {});
+      if (tabId != null) api.tabs.sendMessage(tabId, m, { frameId: 0 }).catch(() => {});
       return;
     case 'lock': // from top frame -> every frame
-      if (tabId != null) chrome.tabs.sendMessage(tabId, m).catch(() => {});
+      if (tabId != null) api.tabs.sendMessage(tabId, m).catch(() => {});
       return;
     case 'cancel':
       jobs.get(tabId)?.abort();
       return;
     case 'capture':
-      capture(sender.tab, m).then(reply);
-      return true;
+      if (!tab) return reply(fail('Capture failed: no active tab'));
+      capture(tab, m).then(reply);
+      return;
     case 'ask':
       ask(m, tabId).then(reply);
-      return true;
+      return;
     case 'test':
       testKey(m.apiKey, m.model).then(reply);
-      return true;
+      return;
   }
-});
+}
 
 const fail = (error) => ({ ok: false, error });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -84,7 +101,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function capture(tab, { rect, vw }) {
   try {
-    const shot = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
+    const shot = await api.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
     const bmp = await createImageBitmap(await (await fetch(shot)).blob());
     const s = bmp.width / vw;
     const sx = Math.max(0, Math.round(rect.x * s));
@@ -114,14 +131,14 @@ async function blobToDataUrl(blob) {
 // ---------- Groq ----------
 
 async function ask({ image, prompt }, tabId) {
-  const s = EQ_merge(await chrome.storage.local.get(null));
+  const s = EQ_merge(await api.storage.local.get(null));
   if (!s.apiKey) return fail('Add your Groq API key in the extension options.');
 
   jobs.get(tabId)?.abort();
   const ac = new AbortController();
   jobs.set(tabId, ac);
   const status = (text) =>
-    tabId != null && chrome.tabs.sendMessage(tabId, { type: 'status', text }, { frameId: 0 }).catch(() => {});
+    tabId != null && api.tabs.sendMessage(tabId, { type: 'status', text }, { frameId: 0 }).catch(() => {});
 
   const maxOut = OUT_TOKENS[s.reasoning] ?? OUT_TOKENS.low;
   const body = {
@@ -226,11 +243,11 @@ async function recordLimits(h) {
     tokLeft: num('x-ratelimit-remaining-tokens'),
     tokReset: now + dur(h.get('x-ratelimit-reset-tokens')),
   };
-  if (rl.reqLeft != null || rl.tokLeft != null) await chrome.storage.local.set({ rl });
+  if (rl.reqLeft != null || rl.tokLeft != null) await api.storage.local.set({ rl });
 }
 
 async function waitForBudget(estimate, status, signal) {
-  const { rl } = await chrome.storage.local.get('rl');
+  const { rl } = await api.storage.local.get('rl');
   if (!rl) return null;
   const now = Date.now();
   if (rl.reqLeft === 0 && rl.reqReset > now) return `Daily limit reached. Resets in ${fmt(rl.reqReset - now)}.`;

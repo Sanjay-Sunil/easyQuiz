@@ -3,27 +3,68 @@
   "name": "easyQuiz",
   "version": "0.1.0",
   "description": "Snip a question, get the answer next to your cursor. Powered by Groq.",
-  "permissions": ["storage", "scripting"],
-  "host_permissions": ["<all_urls>"],
+  "homepage_url": "https://github.com/Sanjay-Sunil/easyQuiz",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "permissions": [
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "scripts": [
+      "defaults.js",
+      "background.js"
+    ]
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["defaults.js", "content.js"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "defaults.js",
+        "content.js"
+      ],
       "run_at": "document_start",
       "all_frames": true
     }
   ],
-  "options_page": "options.html",
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
   "action": {
-    "default_title": "easyQuiz — click to snip"
+    "default_title": "easyQuiz — click to snip",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
   },
   "commands": {
     "activate": {
-      "suggested_key": { "default": "Alt+Shift+Q" },
+      "suggested_key": {
+        "default": "Alt+Shift+Q"
+      },
       "description": "Start a snip (backup shortcut)"
+    }
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "easyquiz@sanjay-sunil.github.io",
+      "strict_min_version": "140.0",
+      "data_collection_permissions": {
+        "required": [
+          "websiteContent"
+        ]
+      }
     }
   }
 }

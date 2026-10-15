@@ -2,11 +2,30 @@
 
 A browser extension: press a shortcut, drag around a question, press Enter, and the answer shows up next to your cursor. Uses Groq's free tier.
 
-## Install (Chrome / Edge / Brave)
+## Install
 
-1. Open `chrome://extensions` and turn on **Developer mode**.
-2. Click **Load unpacked** and select this folder.
-3. The setup page opens. Paste a Groq API key from <https://console.groq.com/keys>, click **Test**, choose your shortcuts, then click **Save**.
+Run `./build.sh` first. It creates `dist/easyquiz-chromium.zip` and `dist/easyquiz-firefox.xpi`, which contain the same code.
+
+### Chromium browsers (Chrome, Edge, Brave, Opera, Vivaldi, Arc)
+1. Open the extensions page (`chrome://extensions`, `edge://extensions`, `brave://extensions`, …).
+2. Turn on **Developer mode** and click **Load unpacked**, then select this folder.
+
+### Zen, Firefox, LibreWolf, Floorp
+**Permanent install (Zen, LibreWolf, Floorp, Firefox Developer/Nightly):**
+1. Open `about:config` and set `xpinstall.signatures.required` to `false`.
+2. Open `about:addons`, click ⚙ → **Install Add-on From File…**, and pick `dist/easyquiz-firefox.xpi`.
+
+**Quick test in any Firefox-based browser (removed on restart):** open `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on…**, and pick `manifest.json`.
+
+**Regular Firefox (release)** only installs signed add-ons. Signing is free and stays private (unlisted):
+`npx web-ext sign --channel=unlisted --api-key=… --api-secret=…`, with keys from addons.mozilla.org → Developer Hub → API keys.
+
+If the setup page shows **Allow access to websites**, click it. Firefox-based browsers sometimes leave site access off at install.
+
+### Then
+The setup page opens. Paste a Groq API key from <https://console.groq.com/keys>, click **Test**, choose your shortcuts, then click **Save**.
+
+Safari isn't supported. It would need an Xcode conversion and a Mac.
 
 ## Use
 
@@ -35,6 +54,8 @@ To save tokens, set Reasoning to **None**. Use **Medium** for harder math.
 - `content.js` (overlay: selection, prompt, answer, and the page lock)
 - `background.js` (screenshot and crop, Groq call, rate-limit handling)
 - `options.html` / `options.js` / `options.css` (setup page)
+- `icons/` (logo: `logo.svg` plus PNG exports)
+- `build.sh` (packages `dist/` for both browser families)
 
 ## Limitations
 

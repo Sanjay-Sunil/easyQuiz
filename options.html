@@ -5,11 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>easyQuiz setup</title>
   <link rel="stylesheet" href="options.css" />
+  <link rel="icon" href="icons/icon-32.png" />
 </head>
 <body>
   <main>
-    <h1>easyQuiz</h1>
+    <h1><img src="icons/logo.svg" alt="" width="32" height="32" class="logo" />easyQuiz</h1>
     <p class="lead">Snip a question, get the answer next to your cursor.</p>
+
+    <section id="access" class="warn" hidden>
+      <h2>Allow access to websites</h2>
+      <p class="note">easyQuiz needs this to draw its overlay and take the screenshot.</p>
+      <button id="grantAccess" type="button" class="primary">Allow on all sites</button>
+    </section>
 
     <section>
       <h2>1. Groq API key</h2>
@@ -32,7 +39,8 @@
       </div>
       <p id="keyErrors" class="status err"></p>
       <p class="note">Backup shortcut that works everywhere (even inside embedded frames):
-        <a href="#" id="openShortcuts">set it in Chrome's shortcut settings</a>.</p>
+        <a href="#" id="openShortcuts">open the browser's shortcut settings</a>.
+        <span id="shortcutHelp"></span></p>
     </section>
 
     <section>

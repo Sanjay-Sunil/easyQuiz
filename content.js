@@ -1,7 +1,8 @@
 (() => {
+  const api = EQ_api;
   const alive = () => {
     try {
-      return !!chrome.runtime?.id;
+      return !!api.runtime?.id;
     } catch {
       return false;
     }
@@ -12,11 +13,11 @@
   const IS_TOP = window === window.top;
   const UI_KEYS = ['keys', 'autoSendSec', 'opacity', 'defaultPrompt'];
   let settings = EQ_merge();
-  const loadSettings = () => chrome.storage.local.get(UI_KEYS).then((s) => (settings = EQ_merge(s)));
+  const loadSettings = () => api.storage.local.get(UI_KEYS).then((s) => (settings = EQ_merge(s)));
   loadSettings();
-  chrome.storage.onChanged.addListener((_, area) => area === 'local' && alive() && loadSettings());
+  api.storage.onChanged.addListener((_, area) => area === 'local' && alive() && loadSettings());
 
-  const send = (msg) => (alive() ? chrome.runtime.sendMessage(msg).catch(() => null) : Promise.resolve(null));
+  const send = (msg) => (alive() ? api.runtime.sendMessage(msg).catch(() => null) : Promise.resolve(null));
   const block = (e) => {
     if (e.cancelable) e.preventDefault();
     e.stopImmediatePropagation();
@@ -37,7 +38,7 @@
   // ---------- iframes: forward the hotkey, and swallow keys while locked ----------
   if (!IS_TOP) {
     let locked = false;
-    chrome.runtime.onMessage.addListener((m) => {
+    api.runtime.onMessage.addListener((m) => {
       if (m.type === 'lock') locked = m.on;
     });
     const onFrameKey = (e) => {
@@ -134,6 +135,12 @@
     const exp = el('exp', panel);
     const hint = el('hint', panel);
     document.documentElement.appendChild(host);
+    if (getComputedStyle(sel).position !== 'fixed') {
+      // Firefox content scripts can't always adopt constructed sheets; use a <style> instead.
+      const style = document.createElement('style');
+      style.textContent = CSS;
+      root.prepend(style);
+    }
     ui = { host, sel, prompt, txt, ph, bar, pill, panel, ans, exp, hint };
     host.style.setProperty('--op', String(settings.opacity));
 
@@ -370,7 +377,7 @@
     }
   }
 
-  chrome.runtime.onMessage.addListener((m) => {
+  api.runtime.onMessage.addListener((m) => {
     if (m.type === 'activate') activate();
     else if (m.type === 'key' && state !== 'idle') handleKey(m.k);
     else if (m.type === 'status' && state === 'loading') showPill(m.text, 'loading');

@@ -30,7 +30,9 @@ body {
   font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 main { max-width: 640px; margin: 0 auto; padding: 32px 16px 64px; }
-h1 { margin: 0; font-size: 24px; }
+h1 { margin: 0; font-size: 24px; display: flex; align-items: center; gap: 10px; }
+.logo { border-radius: 8px; }
+section.warn { border-color: var(--acc); }
 h2 { margin: 0 0 6px; font-size: 15px; }
 .lead { margin: 4px 0 24px; color: var(--mut); }
 section {

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- easyQuiz: a quiet figure inside a snip frame -->
+  <rect width="128" height="128" rx="30" fill="#111111"/>
+  <g fill="none" stroke="#b8b8b8" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M24 46V32a8 8 0 0 1 8-8h14"/>
+    <path d="M82 24h14a8 8 0 0 1 8 8v14"/>
+    <path d="M104 82v14a8 8 0 0 1-8 8H82"/>
+    <path d="M46 104H32a8 8 0 0 1-8-8V82"/>
+  </g>
+  <circle cx="64" cy="55" r="14" fill="#f5f5f5"/>
+  <path d="M38 98c0-15 11.6-25 26-25s26 10 26 25z" fill="#7a7a7a"/>
+</svg>
