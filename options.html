@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>easyQuiz setup</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <main>
+    <h1>easyQuiz</h1>
+    <p class="lead">Snip a question, get the answer next to your cursor.</p>
+
+    <section>
+      <h2>1. Groq API key</h2>
+      <p class="note">Free at <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer">console.groq.com/keys</a>. Stored only in this browser.</p>
+      <div class="row">
+        <input id="apiKey" type="password" placeholder="gsk_…" autocomplete="off" spellcheck="false" />
+        <button id="test" type="button">Test</button>
+      </div>
+      <p id="testStatus" class="status"></p>
+    </section>
+
+    <section>
+      <h2>2. Shortcuts</h2>
+      <p class="note">Click a button, then press the combination you want.</p>
+      <div class="keys">
+        <label>Activate (start snip)</label><button type="button" class="kb" data-key="activate" id="k-activate"></button>
+        <label>Exit (give the page back)</label><button type="button" class="kb" data-key="exit" id="k-exit"></button>
+        <label>Retry (after an answer)</label><button type="button" class="kb" data-key="retry" id="k-retry"></button>
+        <label>Send prompt</label><span class="fixed">Enter</span>
+      </div>
+      <p id="keyErrors" class="status err"></p>
+      <p class="note">Backup shortcut that works everywhere (even inside embedded frames):
+        <a href="#" id="openShortcuts">set it in Chrome's shortcut settings</a>.</p>
+    </section>
+
+    <section>
+      <h2>3. Behaviour</h2>
+      <div class="grid">
+        <label for="autoSendSec">Auto-send if nothing typed (seconds, 0 = off)</label>
+        <input id="autoSendSec" type="number" min="0" max="15" step="1" />
+
+        <label for="defaultPrompt">Default prompt</label>
+        <input id="defaultPrompt" type="text" />
+
+        <label for="opacity">Overlay opacity</label>
+        <input id="opacity" type="range" min="0.3" max="1" step="0.05" />
+
+        <label for="model">Model</label>
+        <input id="model" type="text" spellcheck="false" />
+
+        <label for="reasoning">Reasoning</label>
+        <select id="reasoning">
+          <option value="none">None — fastest, fewest tokens</option>
+          <option value="low">Low — good for most questions</option>
+          <option value="medium">Medium — math/logic, uses more of the limit</option>
+        </select>
+      </div>
+      <p id="usage" class="note"></p>
+    </section>
+
+    <div class="actions">
+      <button id="save" type="button" class="primary">Save</button>
+      <span id="saveStatus" class="status"></span>
+    </div>
+
+    <section class="how">
+      <h2>How to use</h2>
+      <ol>
+        <li>Press the activate shortcut. The cursor becomes a crosshair and the page is locked.</li>
+        <li>Drag around the question.</li>
+        <li>Type an optional note and press Enter. If you type nothing, the default prompt is sent automatically.</li>
+        <li>The answer appears next to your cursor. Longer explanations show in a small panel in the corner.</li>
+        <li>Retry, start a new snip, or press Exit to use the page again.</li>
+      </ol>
+    </section>
+  </main>
+  <script src="defaults.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

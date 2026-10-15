@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "easyQuiz",
+  "version": "0.1.0",
+  "description": "Snip a question, get the answer next to your cursor. Powered by Groq.",
+  "permissions": ["storage", "scripting"],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["defaults.js", "content.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+  "options_page": "options.html",
+  "action": {
+    "default_title": "easyQuiz — click to snip"
+  },
+  "commands": {
+    "activate": {
+      "suggested_key": { "default": "Alt+Shift+Q" },
+      "description": "Start a snip (backup shortcut)"
+    }
+  }
+}

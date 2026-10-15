@@ -1,0 +1,78 @@
+:root {
+  --bg: #fafafa;
+  --card: #ffffff;
+  --fg: #1d1d1f;
+  --mut: #6e6e73;
+  --bd: #e2e2e5;
+  --acc: #2f6feb;
+  --err: #b3261e;
+  --ok: #1a7f37;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161618;
+    --card: #1f1f22;
+    --fg: #ececf0;
+    --mut: #9a9aa2;
+    --bd: #333338;
+    --acc: #6b9bff;
+    --err: #f2b8b5;
+    --ok: #7ee2a8;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+main { max-width: 640px; margin: 0 auto; padding: 32px 16px 64px; }
+h1 { margin: 0; font-size: 24px; }
+h2 { margin: 0 0 6px; font-size: 15px; }
+.lead { margin: 4px 0 24px; color: var(--mut); }
+section {
+  background: var(--card);
+  border: 1px solid var(--bd);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+.note { color: var(--mut); font-size: 13px; margin: 0 0 10px; }
+a { color: var(--acc); }
+input, select, button {
+  font: inherit;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--bd);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+input:focus, select:focus, button:focus-visible { outline: 2px solid var(--acc); outline-offset: 1px; }
+button { cursor: pointer; }
+button.primary { background: var(--acc); border-color: var(--acc); color: #fff; padding: 8px 18px; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+.row { display: flex; gap: 8px; }
+.row input { flex: 1; min-width: 0; }
+.keys, .grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 12px;
+  align-items: center;
+}
+.grid { grid-template-columns: 1fr minmax(0, 240px); }
+.grid input, .grid select { width: 100%; }
+.kb { min-width: 120px; font-family: ui-monospace, monospace; }
+.kb.rec { border-color: var(--acc); color: var(--acc); }
+.fixed { font-family: ui-monospace, monospace; color: var(--mut); padding: 0 10px; }
+.status { min-height: 1.2em; margin: 8px 0 0; font-size: 13px; }
+.status.ok { color: var(--ok); }
+.status.err { color: var(--err); }
+.actions { display: flex; align-items: center; gap: 12px; margin: 4px 0 14px; }
+.actions .status { margin: 0; }
+.how ol { margin: 0; padding-left: 20px; color: var(--mut); }
+@media (max-width: 520px) {
+  .keys, .grid { grid-template-columns: 1fr; }
+}
