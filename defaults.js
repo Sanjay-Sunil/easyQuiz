@@ -5,7 +5,7 @@
 self.EQ_api = globalThis.browser ?? globalThis.chrome;
 
 self.EQ_DEFAULTS = {
-  apiKey: '',
+  apiKeys: [], // rotated per request; see pickKey() in background.js
   model: 'qwen/qwen3.8-27b',
   reasoning: 'low', // none | low | medium
   autoSendSec: 3, // send the default prompt if nothing is typed within N s (0 = off)
@@ -18,11 +18,17 @@ self.EQ_DEFAULTS = {
   },
 };
 
-self.EQ_merge = (stored = {}) => ({
-  ...self.EQ_DEFAULTS,
-  ...stored,
-  keys: { ...self.EQ_DEFAULTS.keys, ...(stored.keys || {}) },
-});
+self.EQ_merge = ({ apiKey, ...stored } = {}) => {
+  const s = {
+    ...self.EQ_DEFAULTS,
+    ...stored,
+    keys: { ...self.EQ_DEFAULTS.keys, ...(stored.keys || {}) },
+  };
+  // Before 0.2 a single key was stored as `apiKey`.
+  if (!s.apiKeys?.length && apiKey) s.apiKeys = [apiKey];
+  s.apiKeys = (s.apiKeys || []).map((k) => k.trim()).filter(Boolean);
+  return s;
+};
 
 // `e` may be a KeyboardEvent or a plain object with the same fields.
 self.EQ_match = (e, kb) =>

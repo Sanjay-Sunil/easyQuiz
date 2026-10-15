@@ -19,13 +19,15 @@
     </section>
 
     <section>
-      <h2>1. Groq API key</h2>
+      <h2>1. Groq API keys</h2>
       <p class="note">Free at <a href="https://console.groq.com/keys" target="_blank" rel="noreferrer">console.groq.com/keys</a>. Stored only in this browser.</p>
+      <div id="keyList"></div>
       <div class="row">
-        <input id="apiKey" type="password" placeholder="gsk_…" autocomplete="off" spellcheck="false" />
+        <button id="addKey" type="button">+ Add key</button>
         <button id="test" type="button">Test</button>
       </div>
-      <p id="testStatus" class="status"></p>
+      <p class="note small">With several keys, each snip uses the next key in turn, and keys that are out of quota are skipped.
+        Groq counts limits per organization, so only keys from different organizations add more quota.</p>
     </section>
 
     <section>

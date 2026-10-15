@@ -2,6 +2,8 @@
 
 Thanks for helping. Bug reports, ideas and pull requests are all welcome.
 
+By taking part you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Setup
 
 There's no build step. The extension is plain JavaScript.

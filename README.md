@@ -32,7 +32,7 @@
 - **Answer at your cursor.** Longer explanations go in a small panel in the corner.
 - **Page locked while open.** Your keys and clicks can't change the page by accident. <kbd>Esc</kbd> gives it back.
 - **Minimal look.** Small, light/dark aware, with adjustable opacity.
-- **Free.** Uses your own Groq key, and stays inside the free-tier limits by itself.
+- **Free.** Uses your own Groq key, and stays inside the free-tier limits by itself. Add several keys and they're used in turn.
 - **Private.** No server, no analytics. See [PRIVACY.md](PRIVACY.md).
 
 ## Install
@@ -81,6 +81,7 @@ You can change any key on the setup page. A backup shortcut (<kbd>Alt</kbd>+<kbd
 
 The default model is `qwen/qwen3.8-27b`, currently Groq's vision model. Its free tier allows **30 requests/min, 1,000/day and 8K tokens/min**, and each image counts as 2,048 tokens.
 easyQuiz reads Groq's rate-limit headers after every call. When you're close to the limit it waits on its own (`wait 4s` shows at the cursor). When the daily limit runs out, it tells you instead of failing. To fit more snips into each minute, set **Reasoning** to *None* on the setup page.
+With several keys, each snip uses the next key in turn, and keys that are out of quota are skipped. Groq counts limits per organization, so only keys from different organizations add more quota.
 
 ## Limitations
 

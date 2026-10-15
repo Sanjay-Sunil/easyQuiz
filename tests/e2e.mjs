@@ -43,7 +43,8 @@ try {
     const real = self.fetch;
     self.fetch = async (url, init = {}) => {
       if (!String(url).startsWith('https://api.groq.com')) return real(url, init);
-      self.__calls.push({ url: String(url), body: init.body ? JSON.parse(init.body) : null });
+      const key = (init.headers?.Authorization || '').replace('Bearer ', '');
+      self.__calls.push({ url: String(url), key, body: init.body ? JSON.parse(init.body) : null });
       const headers = {
         'content-type': 'application/json',
         'x-ratelimit-limit-requests': '1000',
@@ -56,6 +57,8 @@ try {
       if (String(url).endsWith('/models'))
         return new Response(JSON.stringify({ data: [{ id: 'qwen/qwen3.8-27b' }] }), { headers });
       await new Promise((r) => setTimeout(r, 200));
+      if (self.__busyKey === key)
+        return new Response('{"error":{"message":"rate"}}', { status: 429, headers: { ...headers, 'retry-after': '60' } });
       if (self.__mode === '429') {
         self.__mode = 'ok';
         return new Response('{"error":{"message":"rate"}}', { status: 429, headers: { ...headers, 'retry-after': '1' } });
@@ -65,15 +68,16 @@ try {
     };
   });
   const calls = () => sw.evaluate(() => self.__calls.filter((c) => c.body).length);
+  const usedKeys = () => sw.evaluate(() => self.__calls.filter((c) => c.body).map((c) => c.key));
   const lastBody = () => sw.evaluate(() => self.__calls.filter((c) => c.body).at(-1)?.body);
 
   // Setup page
   const opt = await ctx.newPage();
   await opt.goto(`chrome-extension://${extId}/options.html`);
-  await opt.fill('#apiKey', 'gsk_test');
+  await opt.fill('.key-input', 'gsk_test');
   await opt.click('#test');
-  await opt.waitForFunction(() => document.querySelector('#testStatus').textContent !== 'Checking…');
-  check('setup page: key test', (await opt.textContent('#testStatus')) === 'Key works.');
+  await opt.waitForFunction(() => document.querySelector('.key-status').textContent === 'Works.');
+  check('setup page: key test', true);
   await opt.click('#save');
 
   const page = await ctx.newPage();
@@ -130,6 +134,39 @@ try {
   await sleep(3600);
   check('auto-send with default prompt', (await calls()) === before + 1 &&
     (await lastBody()).messages[1].content[0].text === 'Answer this question.');
+  await page.keyboard.press('Escape');
+
+  // Several keys: round-robin, and a rate-limited key is skipped immediately
+  await opt.bringToFront();
+  await opt.click('#addKey');
+  await opt.locator('.key-input').nth(1).fill('gsk_second_key_bbbbbbbb');
+  await opt.click('#addKey');
+  await opt.locator('.key-input').nth(2).fill('gsk_third_key_cccccccc');
+  await opt.click('#save');
+  check('setup page saves 3 keys', /3 keys/.test(await opt.textContent('#saveStatus')));
+  await page.bringToFront();
+  const n0 = (await usedKeys()).length;
+  await page.keyboard.press('Alt+KeyQ');
+  await snip();
+  await page.keyboard.press('Enter');
+  await sleep(600);
+  for (let i = 0; i < 2; i++) {
+    await page.keyboard.press('KeyR');
+    await sleep(600);
+  }
+  const rot = (await usedKeys()).slice(n0);
+  check('keys rotate per request', new Set(rot).size === 3, JSON.stringify(rot));
+  await sw.evaluate(() => (self.__busyKey = 'gsk_second_key_bbbbbbbb'));
+  const t0 = Date.now();
+  const n1 = (await usedKeys()).length;
+  for (let i = 0; i < 3; i++) {
+    await page.keyboard.press('KeyR');
+    await sleep(700);
+  }
+  const after = (await usedKeys()).slice(n1);
+  check('429 key is skipped without waiting', after.filter((k) => k === 'gsk_second_key_bbbbbbbb').length === 1 &&
+    after.length === 4 && Date.now() - t0 < 4000, JSON.stringify(after));
+  await sw.evaluate(() => (self.__busyKey = null));
   await page.keyboard.press('Escape');
 
   // Activation from inside an iframe

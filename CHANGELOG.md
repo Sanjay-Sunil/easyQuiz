@@ -2,6 +2,15 @@
 
 All notable changes are listed here. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-10-15
+
+### Added
+- Multiple Groq API keys: each snip uses the next key in turn, out-of-quota keys are skipped, and a key that returns 429 is parked so the next one is used right away
+- Toolbar icon opens setup when no key is saved yet
+
+### Fixed
+- Setup page now opens the first time the extension runs without a key, including Zen/Firefox add-ons installed from a file and enabled later
+
 ## [0.1.0] - 2026-10-15
 
 ### Added

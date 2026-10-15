@@ -7,9 +7,10 @@ let s = EQ_merge();
 let recording = null;
 
 async function load() {
-  const { rl, ...stored } = await api.storage.local.get(null);
+  // Only settings: leave rate-limit state (rlKeys, keyCursor) to the background.
+  const { rl, rlKeys, keyCursor, setupShown, ...stored } = await api.storage.local.get(null);
   s = EQ_merge(stored);
-  $('apiKey').value = s.apiKey;
+  renderKeyList(s.apiKeys.length ? s.apiKeys : ['']);
   $('autoSendSec').value = s.autoSendSec;
   $('defaultPrompt').value = s.defaultPrompt;
   $('opacity').value = s.opacity;
@@ -45,11 +46,46 @@ function renderKeys() {
   $('save').disabled = errs.length > 0;
 }
 
+// ---------- API keys ----------
+
+function addKeyRow(value = '') {
+  const row = document.createElement('div');
+  row.className = 'row key-row';
+  const input = document.createElement('input');
+  Object.assign(input, { type: 'password', placeholder: 'gsk_…', autocomplete: 'off', spellcheck: false, value });
+  input.className = 'key-input';
+  const remove = document.createElement('button');
+  Object.assign(remove, { type: 'button', textContent: '×', title: 'Remove key', className: 'icon' });
+  remove.addEventListener('click', () => {
+    row.remove();
+    if (!$('keyList').children.length) addKeyRow();
+  });
+  const status = document.createElement('p');
+  status.className = 'status key-status';
+  row.append(input, remove);
+  $('keyList').append(row, status);
+  return input;
+}
+
+function renderKeyList(keys) {
+  $('keyList').replaceChildren();
+  keys.forEach((k) => addKeyRow(k));
+}
+
+const keyInputs = () => [...document.querySelectorAll('.key-input')];
+const readKeys = () => [...new Set(keyInputs().map((i) => i.value.trim()).filter(Boolean))];
+
+$('addKey').addEventListener('click', () => addKeyRow().focus());
+
 async function renderUsage() {
-  const { rl } = await api.storage.local.get('rl');
-  if (!rl || rl.reqLeft == null) return ($('usage').textContent = '');
-  const mins = Math.max(0, Math.ceil((rl.reqReset - Date.now()) / 6e4));
-  $('usage').textContent = `Groq: ${rl.reqLeft}/${rl.reqLimit} requests left today` + (mins ? ` · fully resets in ~${mins} min` : '');
+  const { rlKeys = {} } = await api.storage.local.get('rlKeys');
+  const now = Date.now();
+  const known = s.apiKeys.map((k) => rlKeys[k.slice(-8)]).filter((r) => r?.reqLeft != null);
+  if (!known.length) return ($('usage').textContent = '');
+  const left = known.reduce((n, r) => n + (r.reqReset > now ? r.reqLeft : r.reqLimit), 0);
+  const limit = known.reduce((n, r) => n + r.reqLimit, 0);
+  $('usage').textContent =
+    `Groq: about ${left}/${limit} requests left today` + (known.length > 1 ? ` across ${known.length} keys` : '');
 }
 
 document.querySelectorAll('.kb').forEach((b) =>
@@ -77,24 +113,24 @@ window.addEventListener(
 );
 
 $('test').addEventListener('click', async () => {
-  const st = $('testStatus');
-  st.className = 'status';
-  st.textContent = 'Checking…';
-  const res = await api.runtime.sendMessage({
-    type: 'test',
-    apiKey: $('apiKey').value.trim(),
-    model: $('model').value.trim(),
-  });
-  if (!res?.ok) {
-    st.className = 'status err';
-    st.textContent = `Failed: ${res?.error || 'no response'}`;
-  } else if (!res.hasModel) {
-    st.className = 'status err';
-    st.textContent = 'Key works, but the model below is not available on your account.';
-  } else {
-    st.className = 'status ok';
-    st.textContent = 'Key works.';
-  }
+  const model = $('model').value.trim();
+  const rows = keyInputs().filter((i) => i.value.trim());
+  if (!rows.length) return;
+  await Promise.all(
+    rows.map(async (input) => {
+      const st = input.parentElement.nextElementSibling;
+      st.className = 'status key-status';
+      st.textContent = 'Checking…';
+      const res = await api.runtime.sendMessage({ type: 'test', apiKey: input.value.trim(), model });
+      const ok = res?.ok && res.hasModel;
+      st.className = `status key-status ${ok ? 'ok' : 'err'}`;
+      st.textContent = !res?.ok
+        ? `Failed: ${res?.error || 'no response'}`
+        : res.hasModel
+          ? 'Works.'
+          : 'Works, but the model below is not available on this account.';
+    })
+  );
 });
 
 $('openShortcuts').addEventListener('click', (e) => {
@@ -118,7 +154,7 @@ $('grantAccess').addEventListener('click', async () => {
 $('save').addEventListener('click', async () => {
   const sec = Math.max(0, Math.min(15, Math.round(Number($('autoSendSec').value) || 0)));
   Object.assign(s, {
-    apiKey: $('apiKey').value.trim(),
+    apiKeys: readKeys(),
     autoSendSec: sec,
     defaultPrompt: $('defaultPrompt').value.trim() || EQ_DEFAULTS.defaultPrompt,
     opacity: Number($('opacity').value),
@@ -126,10 +162,15 @@ $('save').addEventListener('click', async () => {
     reasoning: $('reasoning').value,
   });
   await api.storage.local.set(s);
+  await api.storage.local.remove('apiKey'); // pre-0.2 single key, now in apiKeys
+  renderKeyList(s.apiKeys.length ? s.apiKeys : ['']);
   $('autoSendSec').value = sec;
   const st = $('saveStatus');
   st.className = 'status ok';
-  st.textContent = s.apiKey ? 'Saved. Press your activate shortcut on any page.' : 'Saved, but no API key yet.';
+  const n = s.apiKeys.length;
+  st.textContent = !n
+    ? 'Saved, but no API key yet.'
+    : `Saved${n > 1 ? ` (${n} keys, used in turn)` : ''}. Press your activate shortcut on any page.`;
 });
 
 load();

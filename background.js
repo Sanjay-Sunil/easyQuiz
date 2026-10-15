@@ -19,8 +19,18 @@ const jobs = new Map(); // tabId -> AbortController of the in-flight ask
 
 // ---------- lifecycle ----------
 
-api.runtime.onInstalled.addListener(async ({ reason }) => {
-  if (reason === 'install') api.runtime.openOptionsPage();
+// Open setup once when there is no key yet. Not tied to onInstalled: Firefox/Zen
+// don't fire it when the user later enables a side-loaded (file-installed) add-on.
+async function openSetupIfNeeded() {
+  const stored = await api.storage.local.get(null);
+  if (stored.setupShown || EQ_merge(stored).apiKeys.length) return;
+  await api.storage.local.set({ setupShown: true });
+  api.runtime.openOptionsPage();
+}
+openSetupIfNeeded();
+
+api.runtime.onInstalled.addListener(async () => {
+  api.storage.local.remove('rl'); // pre-0.2 single-key rate-limit state
   // Content scripts only auto-load on new page loads; cover tabs that are already open.
   const tabs = await api.tabs.query({ url: ['http://*/*', 'https://*/*'] });
   for (const t of tabs) inject(t.id).catch(() => {});
@@ -30,7 +40,11 @@ api.commands.onCommand.addListener((cmd, tab) => {
   if (cmd === 'activate' && tab?.id != null) toTop(tab.id, { type: 'activate' });
 });
 
-api.action.onClicked.addListener((tab) => toTop(tab.id, { type: 'activate' }));
+// Toolbar icon: start a snip, or go to setup if there's no key to use yet.
+api.action.onClicked.addListener(async (tab) => {
+  if (!EQ_merge(await api.storage.local.get(null)).apiKeys.length) return api.runtime.openOptionsPage();
+  toTop(tab.id, { type: 'activate' });
+});
 
 function inject(tabId) {
   return api.scripting.executeScript({
@@ -132,7 +146,11 @@ async function blobToDataUrl(blob) {
 
 async function ask({ image, prompt }, tabId) {
   const s = EQ_merge(await api.storage.local.get(null));
-  if (!s.apiKey) return fail('Add your Groq API key in the extension options.');
+  const keys = s.apiKeys;
+  if (!keys.length) {
+    api.runtime.openOptionsPage();
+    return fail('No Groq API key yet. Setup page opened.');
+  }
 
   jobs.get(tabId)?.abort();
   const ac = new AbortController();
@@ -141,6 +159,7 @@ async function ask({ image, prompt }, tabId) {
     tabId != null && api.tabs.sendMessage(tabId, { type: 'status', text }, { frameId: 0 }).catch(() => {});
 
   const maxOut = OUT_TOKENS[s.reasoning] ?? OUT_TOKENS.low;
+  const need = IMAGE_TOKENS + PROMPT_TOKENS + maxOut;
   const body = {
     model: s.model,
     messages: [
@@ -159,27 +178,39 @@ async function ask({ image, prompt }, tabId) {
   };
   if (s.reasoning !== 'none') body.reasoning_format = 'hidden';
 
+  const rejected = new Set(); // key indexes Groq refused (bad/revoked key) during this request
+  let lastError = 'No usable API key.';
   try {
-    const blocked = await waitForBudget(IMAGE_TOKENS + PROMPT_TOKENS + maxOut, status, ac.signal);
-    if (blocked) return fail(blocked);
+    for (let attempt = 0; attempt < keys.length + 3; attempt++) {
+      const pick = await pickKey(keys, need, rejected);
+      if (!pick) return fail(lastError);
+      const wait = pick.at - Date.now();
+      if (wait > 90e3)
+        return fail(`${keys.length > 1 ? 'All keys are' : 'Your key is'} out of quota. Next one frees up in ${fmt(wait)}.`);
+      if (wait > 0) await countdown(wait / 1000, status, ac.signal);
 
-    for (let attempt = 0; attempt < 3; attempt++) {
+      const key = keys[pick.idx];
       const res = await fetch(`${API}/chat/completions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${s.apiKey}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
         body: JSON.stringify(body),
         signal: ac.signal,
       });
-      await recordLimits(res.headers);
+      await recordLimits(key, res.headers);
       const data = await res.json().catch(() => null);
 
+      // Out of budget: park this key and move straight on to the next one.
       if (res.status === 429) {
-        const wait = Number(res.headers.get('retry-after')) || 10;
-        if (attempt === 0 && wait <= 30) {
-          await countdown(wait, status, ac.signal);
-          continue;
-        }
-        return fail(`Rate limited. Try again in ${Math.ceil(wait)}s.`);
+        const retry = Number(res.headers.get('retry-after')) || 10;
+        await patchKey(key, { coolUntil: Date.now() + retry * 1000 });
+        lastError = `Rate limited. Try again in ${Math.ceil(retry)}s.`;
+        continue;
+      }
+      if (res.status === 401 || res.status === 403) {
+        await patchKey(key, { coolUntil: Date.now() + 36e5, invalid: true });
+        rejected.add(pick.idx);
+        lastError = `Key …${keyId(key)}: ${data?.error?.message || 'rejected by Groq'}`;
+        continue;
       }
       // A model without reasoning support rejects these params; retry without them.
       if (res.status === 400 && 'reasoning_effort' in body && /reasoning/i.test(data?.error?.message || '')) {
@@ -188,12 +219,13 @@ async function ask({ image, prompt }, tabId) {
         continue;
       }
       if (!res.ok) return fail(data?.error?.message || `Groq error ${res.status}`);
+      await patchKey(key, { coolUntil: 0, invalid: false });
 
       const text = data?.choices?.[0]?.message?.content || '';
       if (!text.trim()) return fail('Empty response. Retry, or lower the reasoning level in options.');
       return { ok: true, ...parseAnswer(text) };
     }
-    return fail('Gave up after retries.');
+    return fail(lastError);
   } catch (e) {
     if (e.name === 'AbortError') return fail('Cancelled');
     return fail('Network error. Check your connection.');
@@ -216,9 +248,12 @@ function parseAnswer(raw) {
   return { answer: clean(first), explanation: text.includes('\n') ? clean(text) : '' };
 }
 
-// ---------- rate limits ----------
-// Groq returns remaining budget in headers on every response; we persist the
-// latest values and wait (or refuse) before sending a request that would 429.
+// ---------- keys and rate limits ----------
+// Groq returns each key's remaining budget in headers on every response. We
+// keep that per key (`rlKeys`, indexed by the key's last 8 chars) plus a
+// cooldown after a 429 or an auth error. Each request starts at the key after
+// the one used last time, so load is spread evenly, and keys without budget
+// are skipped instead of waited on.
 
 const dur = (s) => {
   if (!s) return 0;
@@ -232,7 +267,15 @@ const fmt = (ms) => {
   return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
 };
 
-async function recordLimits(h) {
+const keyId = (key) => key.slice(-8);
+
+async function patchKey(key, fields) {
+  const { rlKeys = {} } = await api.storage.local.get('rlKeys');
+  rlKeys[keyId(key)] = { ...rlKeys[keyId(key)], ...fields };
+  await api.storage.local.set({ rlKeys });
+}
+
+async function recordLimits(key, h) {
   const num = (k) => (h.get(k) == null ? null : Number(h.get(k)));
   const now = Date.now();
   const rl = {
@@ -243,21 +286,34 @@ async function recordLimits(h) {
     tokLeft: num('x-ratelimit-remaining-tokens'),
     tokReset: now + dur(h.get('x-ratelimit-reset-tokens')),
   };
-  if (rl.reqLeft != null || rl.tokLeft != null) await api.storage.local.set({ rl });
+  if (rl.reqLeft != null || rl.tokLeft != null) await patchKey(key, rl);
 }
 
-async function waitForBudget(estimate, status, signal) {
-  const { rl } = await api.storage.local.get('rl');
-  if (!rl) return null;
+// When a key can take a request needing `need` tokens (a timestamp; <= now means ready).
+function readyAt(st, need, now) {
+  if (!st) return now;
+  let at = Math.max(now, st.coolUntil || 0);
+  if (st.reqLeft === 0 && st.reqReset > now) at = Math.max(at, st.reqReset);
+  const n = Math.min(need, st.tokLimit ?? need);
+  if (st.tokLeft != null && st.tokLeft < n && st.tokReset > now) at = Math.max(at, st.tokReset);
+  return at;
+}
+
+// Round-robin from the saved cursor: the first ready key wins; if none is
+// ready, the one that frees up soonest. Returns { idx, at } or null.
+async function pickKey(keys, need, skip) {
+  const { rlKeys = {}, keyCursor = 0 } = await api.storage.local.get(['rlKeys', 'keyCursor']);
   const now = Date.now();
-  if (rl.reqLeft === 0 && rl.reqReset > now) return `Daily limit reached. Resets in ${fmt(rl.reqReset - now)}.`;
-  const need = Math.min(estimate, rl.tokLimit ?? estimate);
-  if (rl.tokLeft != null && rl.tokLeft < need && rl.tokReset > now) {
-    const wait = (rl.tokReset - now) / 1000;
-    if (wait > 90) return `Token limit reached. Try again in ${fmt(wait * 1000)}.`;
-    await countdown(wait, status, signal);
+  let best = null;
+  for (let i = 0; i < keys.length; i++) {
+    const idx = (keyCursor + i) % keys.length;
+    if (skip.has(idx)) continue;
+    const at = readyAt(rlKeys[keyId(keys[idx])], need, now);
+    if (!best || at < best.at) best = { idx, at };
+    if (at <= now) break;
   }
-  return null;
+  if (best) await api.storage.local.set({ keyCursor: (best.idx + 1) % keys.length });
+  return best;
 }
 
 async function countdown(sec, status, signal) {
