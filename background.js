@@ -2,7 +2,8 @@
 if (typeof importScripts === 'function') importScripts('defaults.js');
 const api = EQ_api;
 
-const API = 'https://api.groq.com/openai/v1';
+const GROQ_API = 'https://api.groq.com/openai/v1';
+const GEMINI_API = 'https://generativelanguage.googleapis.com/v1beta/models';
 const IMAGE_TOKENS = 2048; // Groq counts every image as 2048 input tokens
 const PROMPT_TOKENS = 500; // system + user text, rounded up
 const MAX_SIDE = 1600; // px; larger crops are downscaled before upload
@@ -79,7 +80,7 @@ async function senderTab(sender) {
 
 api.runtime.onMessage.addListener((m, sender, reply) => {
   senderTab(sender).then((tab) => handle(m, tab, reply));
-  return ['capture', 'ask', 'test'].includes(m.type);
+  return ['capture', 'ask', 'test', 'testGemini'].includes(m.type);
 });
 
 function handle(m, tab, reply) {
@@ -100,10 +101,13 @@ function handle(m, tab, reply) {
       capture(tab, m).then(reply);
       return;
     case 'ask':
-      ask(m, tabId).then(reply);
+      (m.image ? ask(m, tabId) : askGemini(m, tabId)).then(reply);
       return;
     case 'test':
       testKey(m.apiKey, m.model).then(reply);
+      return;
+    case 'testGemini':
+      testGeminiKey(m.apiKey, m.model).then(reply);
       return;
   }
 }
@@ -166,10 +170,12 @@ async function ask({ image, prompt }, tabId) {
       { role: 'system', content: SYSTEM },
       {
         role: 'user',
-        content: [
-          { type: 'text', text: prompt },
-          { type: 'image_url', image_url: { url: image } },
-        ],
+        content: image
+          ? [
+              { type: 'text', text: prompt },
+              { type: 'image_url', image_url: { url: image } },
+            ]
+          : prompt,
       },
     ],
     max_completion_tokens: maxOut,
@@ -190,7 +196,7 @@ async function ask({ image, prompt }, tabId) {
       if (wait > 0) await countdown(wait / 1000, status, ac.signal);
 
       const key = keys[pick.idx];
-      const res = await fetch(`${API}/chat/completions`, {
+      const res = await fetch(`${GROQ_API}/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
         body: JSON.stringify(body),
@@ -231,6 +237,61 @@ async function ask({ image, prompt }, tabId) {
     return fail('Network error. Check your connection.');
   } finally {
     if (jobs.get(tabId) === ac) jobs.delete(tabId);
+  }
+}
+
+// ---------- Gemini (text-only) ----------
+
+async function askGemini({ prompt }, tabId) {
+  const s = EQ_merge(await api.storage.local.get(null));
+  if (!s.geminiKey) {
+    api.runtime.openOptionsPage();
+    return fail('No Gemini API key yet. Setup page opened.');
+  }
+
+  jobs.get(tabId)?.abort();
+  const ac = new AbortController();
+  jobs.set(tabId, ac);
+  const status = (text) =>
+    tabId != null && api.tabs.sendMessage(tabId, { type: 'status', text }, { frameId: 0 }).catch(() => {});
+
+  status('···');
+  try {
+    const url = `${GEMINI_API}/${s.geminiModel}:generateContent?key=${s.geminiKey}`;
+    const body = {
+      system_instruction: { parts: [{ text: SYSTEM }] },
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: 1500 },
+    };
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: ac.signal,
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) return fail(data?.error?.message || `Gemini error ${res.status}`);
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    if (!text.trim()) return fail('Empty response from Gemini.');
+    return { ok: true, ...parseAnswer(text) };
+  } catch (e) {
+    if (e.name === 'AbortError') return fail('Cancelled');
+    return fail('Network error. Check your connection.');
+  } finally {
+    if (jobs.get(tabId) === ac) jobs.delete(tabId);
+  }
+}
+
+async function testGeminiKey(apiKey, model) {
+  try {
+    const url = `${GEMINI_API}/${model}:generateContent?key=${apiKey}`;
+    const body = { contents: [{ parts: [{ text: 'Hi' }] }], generationConfig: { maxOutputTokens: 5 } };
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const d = await r.json().catch(() => null);
+    if (!r.ok) return fail(d?.error?.message || `HTTP ${r.status}`);
+    return { ok: true };
+  } catch {
+    return fail('Network error');
   }
 }
 

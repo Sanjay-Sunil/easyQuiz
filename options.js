@@ -1,7 +1,7 @@
 const $ = (id) => document.getElementById(id);
 const api = EQ_api;
 const ALL_SITES = { origins: ['<all_urls>'] };
-const KEY_NAMES = ['activate', 'exit', 'retry'];
+const KEY_NAMES = ['activate', 'askText', 'exit', 'retry'];
 const MODIFIERS = ['Shift', 'Control', 'Alt', 'Meta', 'AltGraph', 'OS'];
 let s = EQ_merge();
 let recording = null;
@@ -11,6 +11,8 @@ async function load() {
   const { rl, rlKeys, keyCursor, setupShown, ...stored } = await api.storage.local.get(null);
   s = EQ_merge(stored);
   renderKeyList(s.apiKeys.length ? s.apiKeys : ['']);
+  $('geminiKey').value = s.geminiKey || '';
+  $('geminiModel').value = s.geminiModel;
   $('autoSendSec').value = s.autoSendSec;
   $('defaultPrompt').value = s.defaultPrompt;
   $('opacity').value = s.opacity;
@@ -26,6 +28,8 @@ function keyErrors() {
   const errs = [];
   if (!k.activate.ctrl && !k.activate.alt && !k.activate.meta)
     errs.push('Activate needs Ctrl, Alt or Meta, otherwise it fires while you type.');
+  if (!k.askText.ctrl && !k.askText.alt && !k.askText.meta)
+    errs.push('Ask text needs Ctrl, Alt or Meta, otherwise it fires while you type.');
   for (let i = 0; i < KEY_NAMES.length; i++)
     for (let j = i + 1; j < KEY_NAMES.length; j++)
       if (EQ_label(k[KEY_NAMES[i]]) === EQ_label(k[KEY_NAMES[j]]))
@@ -76,6 +80,17 @@ const keyInputs = () => [...document.querySelectorAll('.key-input')];
 const readKeys = () => [...new Set(keyInputs().map((i) => i.value.trim()).filter(Boolean))];
 
 $('addKey').addEventListener('click', () => addKeyRow().focus());
+
+$('testGemini').addEventListener('click', async () => {
+  const key = $('geminiKey').value.trim();
+  const model = $('geminiModel').value.trim();
+  const st = $('geminiStatus');
+  if (!key) { st.className = 'status key-status err'; st.textContent = 'Enter a key first.'; return; }
+  st.className = 'status key-status'; st.textContent = 'Checking…';
+  const res = await api.runtime.sendMessage({ type: 'testGemini', apiKey: key, model });
+  st.className = `status key-status ${res?.ok ? 'ok' : 'err'}`;
+  st.textContent = res?.ok ? 'Works.' : `Failed: ${res?.error || 'no response'}`;
+});
 
 async function renderUsage() {
   const { rlKeys = {} } = await api.storage.local.get('rlKeys');
@@ -155,6 +170,8 @@ $('save').addEventListener('click', async () => {
   const sec = Math.max(0, Math.min(15, Math.round(Number($('autoSendSec').value) || 0)));
   Object.assign(s, {
     apiKeys: readKeys(),
+    geminiKey: $('geminiKey').value.trim(),
+    geminiModel: $('geminiModel').value.trim() || EQ_DEFAULTS.geminiModel,
     autoSendSec: sec,
     defaultPrompt: $('defaultPrompt').value.trim() || EQ_DEFAULTS.defaultPrompt,
     opacity: Number($('opacity').value),

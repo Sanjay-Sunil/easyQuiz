@@ -11,8 +11,11 @@ self.EQ_DEFAULTS = {
   autoSendSec: 3, // send the default prompt if nothing is typed within N s (0 = off)
   opacity: 0.9,
   defaultPrompt: 'Answer this question.',
+  geminiKey: '',
+  geminiModel: 'gemini-3.8-flash',
   keys: {
     activate: { code: 'KeyQ', alt: true },
+    askText: { code: 'KeyW', alt: true },
     exit: { code: 'Escape' },
     retry: { code: 'KeyR' },
   },

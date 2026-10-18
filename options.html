@@ -31,10 +31,25 @@
     </section>
 
     <section>
-      <h2>2. Shortcuts</h2>
+      <h2>2. Gemini API key</h2>
+      <p class="note">Free at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">aistudio.google.com/apikey</a>. Used for text-copy answers. Stored only in this browser.</p>
+      <div class="row">
+        <input id="geminiKey" type="password" placeholder="AIza…" autocomplete="off" spellcheck="false" class="key-input" style="flex:1" />
+        <button id="testGemini" type="button">Test</button>
+      </div>
+      <p id="geminiStatus" class="status key-status"></p>
+      <div class="grid" style="margin-top:8px">
+        <label for="geminiModel">Gemini model</label>
+        <input id="geminiModel" type="text" spellcheck="false" />
+      </div>
+    </section>
+
+    <section>
+      <h2>3. Shortcuts</h2>
       <p class="note">Click a button, then press the combination you want.</p>
       <div class="keys">
         <label>Activate (start snip)</label><button type="button" class="kb" data-key="activate" id="k-activate"></button>
+        <label>Ask from selected text</label><button type="button" class="kb" data-key="askText" id="k-askText"></button>
         <label>Exit (give the page back)</label><button type="button" class="kb" data-key="exit" id="k-exit"></button>
         <label>Retry (after an answer)</label><button type="button" class="kb" data-key="retry" id="k-retry"></button>
         <label>Send prompt</label><span class="fixed">Enter</span>
@@ -46,7 +61,7 @@
     </section>
 
     <section>
-      <h2>3. Behaviour</h2>
+      <h2>4. Behaviour</h2>
       <div class="grid">
         <label for="autoSendSec">Auto-send if nothing typed (seconds, 0 = off)</label>
         <input id="autoSendSec" type="number" min="0" max="15" step="1" />
