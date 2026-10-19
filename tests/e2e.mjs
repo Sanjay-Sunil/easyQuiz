@@ -74,9 +74,9 @@ try {
   // Setup page
   const opt = await ctx.newPage();
   await opt.goto(`chrome-extension://${extId}/options.html`);
-  await opt.fill('.key-input', 'gsk_test');
+  await opt.fill('#keyList .key-input', 'gsk_test');
   await opt.click('#test');
-  await opt.waitForFunction(() => document.querySelector('.key-status').textContent === 'Works.');
+  await opt.waitForFunction(() => document.querySelector('#keyList .key-status')?.textContent === 'Works.');
   check('setup page: key test', true);
   await opt.click('#save');
 
