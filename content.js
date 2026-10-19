@@ -175,6 +175,16 @@
     startSelecting();
   }
 
+  function activateText() {
+    if (!['idle', 'result', 'error'].includes(state)) return;
+    const text = window.getSelection()?.toString().trim();
+    if (!text) return;
+    mount();
+    image = null;
+    lastPrompt = text;
+    ask();
+  }
+
   function startSelecting() {
     reqId++;
     stopAuto();
@@ -284,7 +294,7 @@
     ui.ans.textContent = answer;
     ui.exp.textContent = explanation;
     ui.exp.className = isError ? 'exp err' : 'exp';
-    ui.hint.textContent = `${EQ_label(k.retry)} retry · ${EQ_label(k.activate)} new snip · ${EQ_label(k.exit)} close`;
+    ui.hint.textContent = `${EQ_label(k.retry)} retry · ${EQ_label(k.activate)} snip · ${EQ_label(k.askText)} text · ${EQ_label(k.exit)} close`;
     ui.panel.scrollTop = 0;
     show(ui.panel);
   }
@@ -339,9 +349,13 @@
       return exit();
     }
     if (state === 'idle') {
-      if (e.type === 'keydown' && EQ_match(e, settings.keys.activate)) {
+      if (e.type !== 'keydown') return;
+      if (EQ_match(e, settings.keys.activate)) {
         block(e);
         activate();
+      } else if (EQ_match(e, settings.keys.askText)) {
+        block(e);
+        activateText();
       }
       return;
     }
@@ -382,4 +396,5 @@
     else if (m.type === 'key' && state !== 'idle') handleKey(m.k);
     else if (m.type === 'status' && state === 'loading') showPill(m.text, 'loading');
   });
+
 })();
