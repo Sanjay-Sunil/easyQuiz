@@ -16,6 +16,7 @@ self.EQ_DEFAULTS = {
   keys: {
     activate: { code: 'KeyQ', alt: true },
     askText: { code: 'KeyW', alt: true },
+    copy: { code: 'KeyS', alt: true },
     exit: { code: 'Escape' },
     retry: { code: 'KeyR' },
   },

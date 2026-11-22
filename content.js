@@ -49,6 +49,9 @@
       } else if (e.type === 'keydown' && EQ_match(e, settings.keys.activate)) {
         block(e);
         send({ type: 'activate' });
+      } else if (e.type === 'keydown' && EQ_match(e, settings.keys.copy)) {
+        block(e);
+        send({ type: 'activate', copy: true });
       }
     };
     listen(KEY_EVENTS, onFrameKey);
@@ -67,6 +70,7 @@
   let ui = null;
   let drag = null;
   let image = null;
+  let copyMode = false; // snip goes to the clipboard instead of the model
   let promptText = '';
   let lastPrompt = '';
   let autoTimer = null;
@@ -169,10 +173,10 @@
 
   // ---------- flow ----------
 
-  function activate() {
+  function activate(copy = false) {
     if (!['idle', 'result', 'error'].includes(state)) return;
     mount();
-    startSelecting();
+    startSelecting(copy);
   }
 
   function activateText() {
@@ -185,7 +189,8 @@
     ask();
   }
 
-  function startSelecting() {
+  function startSelecting(copy = false) {
+    copyMode = copy;
     reqId++;
     stopAuto();
     send({ type: 'cancel' });
@@ -213,12 +218,32 @@
     setState('capturing');
     ui.host.style.visibility = 'hidden';
     await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
-    const res = await send({ type: 'capture', rect: r, vw: innerWidth });
+    const res = await send({ type: 'capture', rect: r, vw: innerWidth, copy: copyMode });
     if (state !== 'capturing' || !ui) return; // exited meanwhile
     ui.host.style.visibility = '';
     if (!res?.ok) return showError(res?.error || 'Capture failed');
+    if (copyMode) return copyToClipboard(res.image);
     image = res.image;
     startPrompt(r);
+  }
+
+  async function copyToClipboard(dataUrl) {
+    const id = reqId;
+    try {
+      // atob, not fetch(dataUrl): the page's CSP may forbid data: fetches.
+      const bin = atob(dataUrl.slice(dataUrl.indexOf(',') + 1));
+      const blob = new Blob([Uint8Array.from(bin, (c) => c.charCodeAt(0))], { type: 'image/png' });
+      window.focus();
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    } catch (e) {
+      if (id !== reqId || !ui) return;
+      return showError(`Copy failed: ${e.message || e}. Clipboard access needs a secure (https) page.`);
+    }
+    if (id !== reqId || !ui) return;
+    setState('result');
+    hide(ui.sel);
+    showPill('Copied', '');
+    setTimeout(() => id === reqId && exit(), 700);
   }
 
   function startPrompt(r) {
@@ -311,6 +336,7 @@
     stopAuto();
     drag = null;
     image = null;
+    copyMode = false;
     state = 'idle';
     if (!ui) return;
     unlisten(MOUSE_EVENTS, onMouse);
@@ -356,6 +382,9 @@
       } else if (EQ_match(e, settings.keys.askText)) {
         block(e);
         activateText();
+      } else if (EQ_match(e, settings.keys.copy)) {
+        block(e);
+        activate(true);
       }
       return;
     }
@@ -392,7 +421,7 @@
   }
 
   api.runtime.onMessage.addListener((m) => {
-    if (m.type === 'activate') activate();
+    if (m.type === 'activate') activate(!!m.copy);
     else if (m.type === 'key' && state !== 'idle') handleKey(m.k);
     else if (m.type === 'status' && state === 'loading') showPill(m.text, 'loading');
   });
