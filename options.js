@@ -78,7 +78,7 @@ function renderKeyList(keys) {
   keys.forEach((k) => addKeyRow(k));
 }
 
-const keyInputs = () => [...document.querySelectorAll('.key-input')];
+const keyInputs = () => [...document.querySelectorAll('#keyList .key-input')];
 const readKeys = () => [...new Set(keyInputs().map((i) => i.value.trim()).filter(Boolean))];
 
 $('addKey').addEventListener('click', () => addKeyRow().focus());

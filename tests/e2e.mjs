@@ -74,9 +74,9 @@ try {
   // Setup page
   const opt = await ctx.newPage();
   await opt.goto(`chrome-extension://${extId}/options.html`);
-  await opt.fill('.key-input', 'gsk_test');
+  await opt.fill('#keyList .key-input', 'gsk_test');
   await opt.click('#test');
-  await opt.waitForFunction(() => document.querySelector('.key-status').textContent === 'Works.');
+  await opt.waitForFunction(() => document.querySelector('#keyList .key-status').textContent === 'Works.');
   check('setup page: key test', true);
   await opt.click('#save');
 
@@ -139,9 +139,9 @@ try {
   // Several keys: round-robin, and a rate-limited key is skipped immediately
   await opt.bringToFront();
   await opt.click('#addKey');
-  await opt.locator('.key-input').nth(1).fill('gsk_second_key_bbbbbbbb');
+  await opt.locator('#keyList .key-input').nth(1).fill('gsk_second_key_bbbbbbbb');
   await opt.click('#addKey');
-  await opt.locator('.key-input').nth(2).fill('gsk_third_key_cccccccc');
+  await opt.locator('#keyList .key-input').nth(2).fill('gsk_third_key_cccccccc');
   await opt.click('#save');
   check('setup page saves 3 keys', /3 keys/.test(await opt.textContent('#saveStatus')));
   await page.bringToFront();

@@ -388,7 +388,7 @@ async function countdown(sec, status, signal) {
 
 async function testKey(apiKey, model) {
   try {
-    const r = await fetch(`${API}/models`, { headers: { Authorization: `Bearer ${apiKey}` } });
+    const r = await fetch(`${GROQ_API}/models`, { headers: { Authorization: `Bearer ${apiKey}` } });
     const d = await r.json().catch(() => null);
     if (!r.ok) return fail(d?.error?.message || `HTTP ${r.status}`);
     return { ok: true, hasModel: (d?.data || []).some((m) => m.id === model) };
