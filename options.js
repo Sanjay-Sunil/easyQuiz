@@ -1,7 +1,7 @@
 const $ = (id) => document.getElementById(id);
 const api = EQ_api;
 const ALL_SITES = { origins: ['<all_urls>'] };
-const KEY_NAMES = ['activate', 'askText', 'exit', 'retry'];
+const KEY_NAMES = ['activate', 'askText', 'copy', 'exit', 'retry'];
 const MODIFIERS = ['Shift', 'Control', 'Alt', 'Meta', 'AltGraph', 'OS'];
 let s = EQ_merge();
 let recording = null;
@@ -30,6 +30,8 @@ function keyErrors() {
     errs.push('Activate needs Ctrl, Alt or Meta, otherwise it fires while you type.');
   if (!k.askText.ctrl && !k.askText.alt && !k.askText.meta)
     errs.push('Ask text needs Ctrl, Alt or Meta, otherwise it fires while you type.');
+  if (!k.copy.ctrl && !k.copy.alt && !k.copy.meta)
+    errs.push('Copy snip needs Ctrl, Alt or Meta, otherwise it fires while you type.');
   for (let i = 0; i < KEY_NAMES.length; i++)
     for (let j = i + 1; j < KEY_NAMES.length; j++)
       if (EQ_label(k[KEY_NAMES[i]]) === EQ_label(k[KEY_NAMES[j]]))
@@ -76,7 +78,7 @@ function renderKeyList(keys) {
   keys.forEach((k) => addKeyRow(k));
 }
 
-const keyInputs = () => [...document.querySelectorAll('.key-input')];
+const keyInputs = () => [...document.querySelectorAll('#keyList .key-input')];
 const readKeys = () => [...new Set(keyInputs().map((i) => i.value.trim()).filter(Boolean))];
 
 $('addKey').addEventListener('click', () => addKeyRow().focus());

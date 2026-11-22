@@ -2,6 +2,11 @@
 
 All notable changes are listed here. Versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- Snip to clipboard: <kbd>Alt</kbd>+<kbd>S</kbd> copies the selected area as a full-resolution PNG, with nothing saved or sent to a model
+
 ## [0.2.0] - 2026-10-15
 
 ### Added

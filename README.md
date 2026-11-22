@@ -86,6 +86,12 @@ If you see **Allow access to websites**, click it. Firefox-based browsers someti
 | --- | --- |
 | Select text on the page, then ask | <kbd>Alt</kbd>+<kbd>W</kbd> |
 
+### Snip to clipboard
+
+| | Default key |
+| --- | --- |
+| Snip an area and copy it as an image (nothing is saved or sent) | <kbd>Alt</kbd>+<kbd>S</kbd>, then drag |
+
 ### Common
 
 | | Default key |

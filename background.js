@@ -117,7 +117,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------- screenshot ----------
 
-async function capture(tab, { rect, vw }) {
+async function capture(tab, { rect, vw, copy }) {
   try {
     const shot = await api.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
     const bmp = await createImageBitmap(await (await fetch(shot)).blob());
@@ -126,13 +126,13 @@ async function capture(tab, { rect, vw }) {
     const sy = Math.max(0, Math.round(rect.y * s));
     const sw = Math.min(bmp.width - sx, Math.round(rect.w * s));
     const sh = Math.min(bmp.height - sy, Math.round(rect.h * s));
-    const k = Math.min(1, MAX_SIDE / Math.max(sw, sh));
+    const k = copy ? 1 : Math.min(1, MAX_SIDE / Math.max(sw, sh)); // clipboard keeps full resolution
     const canvas = new OffscreenCanvas(Math.max(1, Math.round(sw * k)), Math.max(1, Math.round(sh * k)));
     const ctx = canvas.getContext('2d');
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(bmp, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
     let blob = await canvas.convertToBlob({ type: 'image/png' });
-    if (blob.size > 1.5e6) blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.9 });
+    if (!copy && blob.size > 1.5e6) blob = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.9 });
     return { ok: true, image: await blobToDataUrl(blob) };
   } catch (e) {
     return fail(`Capture failed: ${e.message || e}`);
@@ -388,7 +388,7 @@ async function countdown(sec, status, signal) {
 
 async function testKey(apiKey, model) {
   try {
-    const r = await fetch(`${API}/models`, { headers: { Authorization: `Bearer ${apiKey}` } });
+    const r = await fetch(`${GROQ_API}/models`, { headers: { Authorization: `Bearer ${apiKey}` } });
     const d = await r.json().catch(() => null);
     if (!r.ok) return fail(d?.error?.message || `HTTP ${r.status}`);
     return { ok: true, hasModel: (d?.data || []).some((m) => m.id === model) };
